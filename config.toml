@@ -1,0 +1,52 @@
+# Webflow CMS image upscaling pipeline — all settings.
+# Relative paths are resolved against the folder that contains this file.
+
+[paths]
+input_csv = "input/projects.csv"
+originals_override = "originals_override"
+cache = "cache"
+output = "output"
+logs = "logs"
+
+[download]
+workers = 6
+retries = 3
+timeout_s = 60
+backoff_base_s = 1.0          # waits 1 s, 2 s, 4 s between retries
+
+[realesrgan]
+binary = "tools/realesrgan/realesrgan-ncnn-vulkan"
+models_dir = "tools/realesrgan/models"
+model = "realesrgan-x4plus"   # general photo model; do not use the anime models
+scale = 4
+tile_sizes = [400, 200, 100]  # tried in order; a smaller one is used after a GPU memory failure
+gpu_id = "auto"               # "auto" or an integer GPU index
+timeout_s = 900
+
+[output]
+target_width = 3440
+max_bytes = 3500000           # limit for the final WebP (Claude in Chrome file_upload: 3.8 MB, Webflow CMS: 4 MB)
+master_jpeg_quality = 95      # reference JPEG in cache/encoded/ (not uploaded, no size limit)
+
+[webp]
+# Final upload format. Same encoder settings as optimize_images.sh.
+cwebp = "cwebp"                # installed separately (brew install webp); a name on PATH or a full path
+quality = 82                  # optimize_images.sh default; lowered only if the file exceeds max_bytes
+quality_min = 60
+method = 6                    # slowest / best compression
+sharp_yuv = true              # sharper, more accurate colour edges
+metadata = "none"             # strip EXIF, XMP and ICC (pixels are already sRGB)
+
+[texture]
+# Real-ESRGAN flattens fine, low-contrast texture (concrete, plaster, wood grain) because it treats
+# it as noise. These post-processing steps bring it back; they apply only to AI-upscaled images.
+source_blend = 0.36       # 0..1: mix a plain Lanczos upscale of the real source back into the AI result
+sharpen = 60              # unsharp mask strength in percent (0 = off)
+sharpen_radius = 1.5      # px
+sharpen_threshold = 2     # levels; protects flat areas such as sky
+grain = 0.0               # monochrome grain std dev in 8-bit levels (0 = off); increases file size
+grain_size = 1.4          # grain size in output px
+
+[verify]
+aspect_tolerance = 0.005      # 0.5 %
+min_luma_stddev = 2.0         # below this the image is treated as blank
